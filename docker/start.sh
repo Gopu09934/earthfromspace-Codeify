@@ -2,33 +2,32 @@
 
 set -euo pipefail
 
-mkdir -p /app/videos
-
-# Use VIDEO_URL from environment
+# Check VIDEO_URL
 if [ -z "${VIDEO_URL:-}" ]; then
     echo "ERROR: VIDEO_URL is not set."
     exit 1
 fi
 
-echo "Downloading video..."
-echo "$VIDEO_URL"
+# Check YouTube Stream Key
+if [ -z "${YOUTUBE_STREAM_KEY:-}" ]; then
+    echo "ERROR: YOUTUBE_STREAM_KEY is not set."
+    exit 1
+fi
 
-curl -L --fail --retry 3 --retry-delay 5 \
-    -o /app/videos/video.mp4 \
-    "$VIDEO_URL"
-
-echo "Verifying video..."
-
-ffprobe -v error /app/videos/video.mp4
-
-echo "Starting stream..."
+echo "========================================"
+echo "Starting YouTube Live Stream..."
+echo "Video URL: $VIDEO_URL"
+echo "========================================"
 
 exec ffmpeg \
     -re \
     -stream_loop -1 \
-    -i /app/videos/video.mp4 \
+    -i "$VIDEO_URL" \
     -c:v libx264 \
     -preset ultrafast \
+    -pix_fmt yuv420p \
     -c:a aac \
+    -b:a 128k \
+    -ar 44100 \
     -f flv \
     "rtmp://a.rtmp.youtube.com/live2/${YOUTUBE_STREAM_KEY}"
