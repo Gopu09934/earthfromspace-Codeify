@@ -1,66 +1,50 @@
-#!/bin/bash
+name: Stream
 
-set -euo pipefail
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */5 * * *"
 
-# Validate required environment variables
-if [ -z "${VIDEO_URL:-}" ]; then
-    echo "ERROR: VIDEO_URL is not set"
-    exit 1
-fi
+jobs:
+  stream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    
+    steps:
+      - uses: actions/checkout@v4
 
-if [ -z "${YOUTUBE_STREAM_KEY:-}" ]; then
-    echo "ERROR: YOUTUBE_STREAM_KEY is not set"
-    exit 1
-fi
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-echo "========================================"
-echo "Starting 24/7 YouTube Stream..."
-echo "========================================"
+      - name: Build Docker Image
+        run: |
+          docker build \
+            --progress=plain \
+            -t yt-stream:latest \
+            -f ./docker/Dockerfile \
+            ./docker/
+        timeout-minutes: 30
 
-# Split multiple URLs (comma-separated)
-IFS=',' read -ra URLS <<< "$VIDEO_URL"
+      - name: Verify Docker Image
+        run: |
+          docker images | grep yt-stream
+          docker run --rm yt-stream:latest yt-dlp --version
 
-# Loop forever
-while true; do
-    for url in "${URLS[@]}"; do
+      - name: Start Stream
+        run: |
+          docker run \
+            --rm \
+            -e VIDEO_URL="${{ secrets.VIDEO_URL }}" \
+            -e YOUTUBE_STREAM_KEY="${{ secrets.YOUTUBE_STREAM_KEY }}" \
+            --name yt-stream-container \
+            yt-stream:latest
+        timeout-minutes: 355
+        continue-on-error: true
 
-        echo "----------------------------------------"
-        echo "Streaming: $url"
-        echo "----------------------------------------"
-
-        # If it's a YouTube URL, convert it to direct stream URL
-        INPUT_URL="$url"
-
-        if [[ "$url" == *"youtube.com"* || "$url" == *"youtu.be"* ]]; then
-            INPUT_URL=$(yt-dlp -g "$url" || true)
-        fi
-
-        ffmpeg \
-            -hide_banner \
-            -loglevel info \
-            -re \
-            -i "$INPUT_URL" \
-            -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2" \
-            -r 30 \
-            -c:v libx264 \
-            -preset ultrafast \
-            -tune zerolatency \
-            -pix_fmt yuv420p \
-            -b:v 3000k \
-            -maxrate 3000k \
-            -bufsize 6000k \
-            -g 60 \
-            -keyint_min 60 \
-            -c:a aac \
-            -b:a 128k \
-            -ar 44100 \
-            -ac 2 \
-            -f flv \
-            "rtmp://a.rtmp.youtube.com/live2/${YOUTUBE_STREAM_KEY}" || true
-
-        echo "Finished: $url"
-        echo "Waiting 5 seconds before next video..."
-        sleep 5
-
-    done
-done
+      - name: Upload Logs
+        if: failure()
+        run: |
+          echo "Stream job failed. Check logs above for details."
+          exit 1
