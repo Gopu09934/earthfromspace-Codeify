@@ -28,11 +28,18 @@ while true; do
         echo "Streaming: $url"
         echo "----------------------------------------"
 
+        # If it's a YouTube URL, convert it to direct stream URL
+        INPUT_URL="$url"
+
+        if [[ "$url" == *"youtube.com"* || "$url" == *"youtu.be"* ]]; then
+            INPUT_URL=$(yt-dlp -g "$url" || true)
+        fi
+
         ffmpeg \
             -hide_banner \
             -loglevel info \
             -re \
-            -i "$url" \
+            -i "$INPUT_URL" \
             -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2" \
             -r 30 \
             -c:v libx264 \
