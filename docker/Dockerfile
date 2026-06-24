@@ -13,21 +13,19 @@ RUN apt-get update && \
         wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js (for yt-dlp JavaScript runtime)
+# Node.js
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp (with --break-system-packages for Python 3.12)
-RUN pip3 install --no-cache-dir --break-system-packages yt-dlp
-
-# Verify installations
-RUN ffmpeg -version | head -1 && \
-    yt-dlp --version && \
-    node --version
+# yt-dlp (latest stable)
+RUN pip3 install --no-cache-dir --break-system-packages -U yt-dlp
 
 WORKDIR /app
-COPY start.sh .
-RUN chmod +x start.sh
 
-CMD ["bash", "./start.sh"]
+COPY start.sh /app/start.sh
+COPY cookies.txt /app/cookies.txt
+
+RUN chmod +x /app/start.sh
+
+CMD ["bash", "/app/start.sh"]
