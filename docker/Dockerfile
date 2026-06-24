@@ -2,29 +2,31 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Update apt sources and install dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ffmpeg \
         curl \
-        wget \
         ca-certificates \
         python3 \
         python3-pip \
         git \
+        wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp binary (most reliable method)
-RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
-    -o /usr/local/bin/yt-dlp && \
-    chmod +x /usr/local/bin/yt-dlp && \
-    yt-dlp --version
+# Install Node.js (for yt-dlp JavaScript runtime)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
-# Verify ffmpeg is installed
-RUN ffmpeg -version | head -n 1
+# Install yt-dlp
+RUN pip3 install --no-cache-dir yt-dlp
+
+# Verify installations
+RUN ffmpeg -version | head -1 && \
+    yt-dlp --version && \
+    node --version
 
 WORKDIR /app
-
 COPY start.sh .
 RUN chmod +x start.sh
 
