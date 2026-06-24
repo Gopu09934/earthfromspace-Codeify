@@ -2,21 +2,26 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN sed -i 's|http://archive.ubuntu.com|http://security.ubuntu.com|g' /etc/apt/sources.list || true
-
-RUN apt-get update --fix-missing && \
+# Update apt sources and install dependencies
+RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ffmpeg \
         curl \
+        wget \
         ca-certificates \
         python3 \
         python3-pip \
-        python3-dev \
-        build-essential \
+        git \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --upgrade pip setuptools wheel && \
-    pip3 install --no-cache-dir yt-dlp
+# Install yt-dlp binary (most reliable method)
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
+    -o /usr/local/bin/yt-dlp && \
+    chmod +x /usr/local/bin/yt-dlp && \
+    yt-dlp --version
+
+# Verify ffmpeg is installed
+RUN ffmpeg -version | head -n 1
 
 WORKDIR /app
 
