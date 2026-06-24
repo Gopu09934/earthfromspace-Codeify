@@ -18,8 +18,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# Install yt-dlp
-RUN pip3 install --no-cache-dir yt-dlp
+# Install yt-dlp (with --break-system-packages for Python 3.12)
+RUN pip3 install --no-cache-dir --break-system-packages yt-dlp
 
 # Verify installations
 RUN ffmpeg -version | head -1 && \
