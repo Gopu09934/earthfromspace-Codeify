@@ -12,84 +12,80 @@ if [ -z "${YOUTUBE_STREAM_KEY:-}" ]; then
 fi
 
 echo "========================================"
-echo "Starting 24/7 YouTube Stream..."
+echo "Starting 24/7 YouTube Stream Engine"
 echo "========================================"
-echo "Node version:"
-node --version
-echo "yt-dlp version:"
+
+echo "yt-dlp:"
 yt-dlp --version
-echo "ffmpeg version:"
+
+echo "ffmpeg:"
 ffmpeg -version | head -1
+
 echo "========================================"
 
 IFS=',' read -ra URLS <<< "$VIDEO_URL"
 
 while true; do
-    for url in "${URLS[@]}"; do
-        echo "----------------------------------------"
-        echo "Processing: $url"
-        echo "----------------------------------------"
-        
-        INPUT_URL="$url"
-        
-        # Extract video from YouTube
-        if [[ "$url" == *"youtube.com"* || "$url" == *"youtu.be"* ]]; then
-            echo "Detecting YouTube URL, extracting stream..."
-            
-            # Try to get the direct stream URL using yt-dlp with Node.js runtime
-            if INPUT_URL=$(yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]" -g "$url" 2>&1); then
-                echo "✓ Stream URL extracted successfully"
-            else
-                echo "✗ Failed to extract with best format, trying alternative..."
-                # Fallback: try with HLS format (better for live streams)
-                if INPUT_URL=$(yt-dlp -f "best" -g "$url" 2>&1); then
-                    echo "✓ Fallback stream URL extracted"
-                else
-                    echo "✗ All extraction methods failed. Check YouTube privacy settings."
-                    echo "Waiting before retry..."
-                    sleep 10
-                    continue
-                fi
-            fi
+  for url in "${URLS[@]}"; do
+
+    echo "----------------------------------------"
+    echo "Processing: $url"
+    echo "----------------------------------------"
+
+    # Extract stream URL (FIXED with cookies + android client)
+    STREAM_URL=""
+
+    if [[ "$url" == *"youtube.com"* || "$url" == *"youtu.be"* ]]; then
+
+        echo "Extracting YouTube stream..."
+
+        STREAM_URL=$(yt-dlp \
+            --cookies /app/cookies.txt \
+            --extractor-args "youtube:player_client=android" \
+            -f "bv*+ba/best" \
+            -g "$url" 2>/dev/null || true)
+
+        if [ -z "$STREAM_URL" ]; then
+            echo "⚠ Primary extraction failed, trying fallback..."
+
+            STREAM_URL=$(yt-dlp \
+                --cookies /app/cookies.txt \
+                -f "best" \
+                -g "$url" 2>/dev/null || true)
         fi
-        
-        echo "Starting ffmpeg stream with URL: ${INPUT_URL:0:50}..."
-        
-        # Stream to YouTube with error handling
-        if ffmpeg \
-            -hide_banner \
-            -loglevel warning \
-            -re \
-            -i "$INPUT_URL" \
-            -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2" \
-            -r 30 \
-            -c:v libx264 \
-            -preset ultrafast \
-            -tune zerolatency \
-            -pix_fmt yuv420p \
-            -b:v 3000k \
-            -maxrate 3000k \
-            -bufsize 6000k \
-            -g 60 \
-            -keyint_min 60 \
-            -c:a aac \
-            -b:a 128k \
-            -ar 44100 \
-            -ac 2 \
-            -f flv \
-            "rtmp://a.rtmp.youtube.com/live2/${YOUTUBE_STREAM_KEY}"; then
-            echo "✓ Stream completed successfully"
-        else
-            echo "✗ ffmpeg streaming failed with exit code: $?"
+
+        if [ -z "$STREAM_URL" ]; then
+            echo "❌ Failed to extract stream. Skipping..."
+            sleep 10
+            continue
         fi
-        
-        echo "Finished streaming"
-        echo "Waiting 5 seconds before next URL..."
-        sleep 5
-    done
-    
-    echo ""
-    echo "Completed all URLs, restarting loop..."
-    echo "Next attempt in 30 seconds..."
-    sleep 30
+
+    else
+        STREAM_URL="$url"
+    fi
+
+    echo "Stream ready!"
+
+    # FFmpeg streaming (AUTO RECOVERY ENABLED)
+    ffmpeg -hide_banner -loglevel warning \
+        -re \
+        -i "$STREAM_URL" \
+        -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2" \
+        -r 30 \
+        -c:v libx264 -preset veryfast -tune zerolatency \
+        -pix_fmt yuv420p \
+        -b:v 3000k -maxrate 3000k -bufsize 6000k \
+        -g 60 \
+        -c:a aac -b:a 128k -ar 44100 -ac 2 \
+        -f flv \
+        "rtmp://a.rtmp.youtube.com/live2/${YOUTUBE_STREAM_KEY}" \
+    || echo "❌ ffmpeg crashed, restarting..."
+
+    echo "Waiting 5 seconds..."
+    sleep 5
+
+  done
+
+  echo "Loop completed. Restarting in 30 seconds..."
+  sleep 30
 done
