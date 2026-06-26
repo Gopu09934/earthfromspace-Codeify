@@ -20,5 +20,5 @@ jobs:
         run: |
           docker run \
             -e VIDEO_URL="${{ secrets.VIDEO_URL }}" \
-            -e YOUTUBE_STREAM_KEY="${{ secrets.YOUTUBE_STREAM_KEY }}" \
+            -e YOUTUBE_STREAM_KEY="${{ secrets.FACEBOOK_STREAM_KEY }}" \
             yt-stream
