@@ -8,13 +8,13 @@ if [ -z "${VIDEO_URL:-}" ]; then
     exit 1
 fi
 
-if [ -z "${YOUTUBE_STREAM_KEY:-}" ]; then
-    echo "ERROR: YOUTUBE_STREAM_KEY is not set"
+if [ -z "${FACEBOOK_STREAM_KEY:-}" ]; then
+    echo "ERROR: FACEBOOK_STREAM_KEY is not set"
     exit 1
 fi
 
 echo "========================================"
-echo "Starting 24/7 YouTube Stream..."
+echo "Starting 24/7 Facebook Live Stream..."
 echo "========================================"
 
 # Split multiple URLs (comma-separated)
@@ -49,7 +49,7 @@ while true; do
             -ar 44100 \
             -ac 2 \
             -f flv \
-            "rtmp://a.rtmp.youtube.com/live2/${YOUTUBE_STREAM_KEY}" || true
+            "rtmps://live-api-s.facebook.com:443/rtmp/${FACEBOOK_STREAM_KEY}" || true
 
         echo "Finished: $url"
         echo "Waiting 5 seconds before next video..."
